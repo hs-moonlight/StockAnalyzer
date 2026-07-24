@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>Stock Technical Analyzer</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --text:#1a1d23; --muted:#6b7280; --border:#e5e7eb;
+    --accent:#2563eb; --accent-ink:#ffffff;
+    --bull:#16a34a; --bull-bg:#dcfce7;
+    --bear:#dc2626; --bear-bg:#fee2e2;
+    --neutral:#a16207; --neutral-bg:#fef3c7;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1115; --panel:#1a1d24; --text:#e8eaed; --muted:#9aa0aa; --border:#2a2e37;
+      --accent:#3b82f6; --accent-ink:#ffffff;
+      --bull:#4ade80; --bull-bg:#0f2a1a;
+      --bear:#f87171; --bear-bg:#2c1414;
+      --neutral:#facc15; --neutral-bg:#2c2712;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1115; --panel:#1a1d24; --text:#e8eaed; --muted:#9aa0aa; --border:#2a2e37;
+    --accent:#3b82f6; --accent-ink:#ffffff;
+    --bull:#4ade80; --bull-bg:#0f2a1a;
+    --bear:#f87171; --bear-bg:#2c1414;
+    --neutral:#facc15; --neutral-bg:#2c2712;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f6f8; --panel:#ffffff; --text:#1a1d23; --muted:#6b7280; --border:#e5e7eb;
+    --accent:#2563eb; --accent-ink:#ffffff;
+    --bull:#16a34a; --bull-bg:#dcfce7;
+    --bear:#dc2626; --bear-bg:#fee2e2;
+    --neutral:#a16207; --neutral-bg:#fef3c7;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  body{min-height:100vh;padding-bottom:40px;}
+  .wrap{max-width:840px;margin:0 auto;padding:16px;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:8px 0 20px;}
+  header h1{font-size:1.3rem;margin:0;font-weight:700;}
+  header .sub{color:var(--muted);font-size:.8rem;margin-top:2px;}
+  .icon-btn{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    font-size:1.1rem;color:var(--text);}
+  .icon-btn:hover{border-color:var(--accent);}
+
+  .search-row{display:flex;gap:8px;margin-bottom:10px;}
+  #tickerInput{flex:1;padding:14px 16px;border-radius:12px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);font-size:1rem;}
+  #tickerInput:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+  #analyzeBtn{padding:14px 22px;border-radius:12px;border:none;background:var(--accent);
+    color:var(--accent-ink);font-size:1rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+  #analyzeBtn:disabled{opacity:.6;cursor:default;}
+  .range-row{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+  .range-chip{padding:6px 14px;border-radius:999px;border:1px solid var(--border);
+    background:var(--panel);color:var(--muted);font-size:.82rem;cursor:pointer;}
+  .range-chip.active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+
+  #settingsPanel{display:none;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);}
+  #settingsPanel label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:4px;margin-top:10px;}
+  #settingsPanel input{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--border);
+    background:var(--bg);color:var(--text);font-size:.85rem;}
+  #settingsPanel .hint{font-size:.72rem;color:var(--muted);margin-top:4px;}
+  #settingsPanel .row{display:flex;gap:8px;align-items:center;margin-top:12px;}
+
+  #status{padding:14px 16px;border-radius:12px;font-size:.9rem;margin-bottom:16px;display:none;}
+  #status.info{background:var(--panel);border:1px solid var(--border);color:var(--muted);display:block;}
+  #status.error{background:var(--bear-bg);color:var(--bear);display:block;}
+
+  #results{display:none;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;
+    margin-bottom:14px;box-shadow:var(--shadow);}
+
+  .quote-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;}
+  .quote-head h2{margin:0;font-size:1.3rem;}
+  .quote-head .name{color:var(--muted);font-size:.85rem;margin-top:2px;}
+  .price-block{text-align:right;}
+  .price-block .price{font-size:1.5rem;font-weight:700;}
+  .price-block .change{font-size:.85rem;font-weight:600;}
+  .change.up{color:var(--bull);} .change.down{color:var(--bear);}
+  svg.spark{width:100%;height:70px;margin-top:14px;display:block;}
+
+  .verdict-card{text-align:center;padding:26px 18px;}
+  .verdict-badge{display:inline-block;padding:10px 26px;border-radius:999px;font-size:1.25rem;
+    font-weight:800;letter-spacing:.02em;}
+  .verdict-sub{color:var(--muted);font-size:.85rem;margin-top:10px;}
+  .score-bar{position:relative;height:8px;border-radius:99px;background:linear-gradient(90deg,var(--bear) 0%, var(--neutral) 50%, var(--bull) 100%);
+    margin:18px auto 4px;max-width:320px;}
+  .score-marker{position:absolute;top:-4px;width:16px;height:16px;border-radius:50%;
+    background:var(--panel);border:3px solid var(--text);transform:translateX(-50%);}
+  .summary-text{font-size:.92rem;line-height:1.55;margin-top:16px;text-align:left;color:var(--text);}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:560px){ .grid{grid-template-columns:1fr;} }
+  .ind-card .ind-top{display:flex;justify-content:space-between;align-items:center;}
+  .ind-name{font-weight:700;font-size:.95rem;}
+  .ind-value{font-size:1.15rem;font-weight:700;margin-top:6px;}
+  .tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;
+    text-transform:uppercase;letter-spacing:.03em;}
+  .tag.bull{background:var(--bull-bg);color:var(--bull);}
+  .tag.bear{background:var(--bear-bg);color:var(--bear);}
+  .tag.neutral{background:var(--neutral-bg);color:var(--neutral);}
+  .ind-desc{color:var(--muted);font-size:.8rem;margin-top:8px;line-height:1.4;}
+
+  footer{color:var(--muted);font-size:.72rem;text-align:center;margin-top:26px;line-height:1.5;padding:0 10px;}
+
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;
+    border-radius:50%;display:inline-block;animation:spin .7s linear infinite;vertical-align:-3px;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Stock Technical Analyzer</h1>
+      <div class="sub">RSI &middot; CMF &middot; ADX &middot; MACD</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">&#9788;</button>
+      <button class="icon-btn" id="settingsBtn" title="Settings">&#9881;</button>
+    </div>
+  </header>
+
+  <div class="search-row">
+    <input id="tickerInput" type="text" placeholder="Enter ticker (e.g. AAPL) or company name (e.g. Apple)" autocomplete="off" />
+    <button id="analyzeBtn">Analyze</button>
+  </div>
+  <div class="range-row" id="rangeRow">
+    <div class="range-chip" data-range="6mo">6M</div>
+    <div class="range-chip active" data-range="1y">1Y</div>
+    <div class="range-chip" data-range="2y">2Y</div>
+  </div>
+
+  <div id="settingsPanel">
+    <strong>Settings</strong>
+    <label for="apiKeyInput">Twelve Data API key</label>
+    <input id="apiKeyInput" type="text" placeholder="Paste your API key" autocomplete="off" />
+    <div class="hint">Free, no card required &mdash; get one at <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">twelvedata.com/pricing</a>. Stored only in this browser (localStorage), never sent anywhere but Twelve Data.</div>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="results">
+    <div class="card">
+      <div class="quote-head">
+        <div>
+          <h2 id="qSymbol">--</h2>
+          <div class="name" id="qName">--</div>
+        </div>
+        <div class="price-block">
+          <div class="price" id="qPrice">--</div>
+          <div class="change" id="qChange">--</div>
+        </div>
+      </div>
+      <svg class="spark" id="sparkSvg" viewBox="0 0 600 70" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="card verdict-card">
+      <div class="verdict-badge" id="verdictBadge">--</div>
+      <div class="score-bar"><div class="score-marker" id="scoreMarker"></div></div>
+      <div class="verdict-sub" id="verdictScore">--</div>
+      <div class="summary-text" id="summaryText"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card ind-card" id="cardRSI">
+        <div class="ind-top"><span class="ind-name">RSI (14)</span><span class="tag" id="tagRSI">--</span></div>
+        <div class="ind-value" id="valRSI">--</div>
+        <div class="ind-desc" id="descRSI">--</div>
+      </div>
+      <div class="card ind-card" id="cardMACD">
+        <div class="ind-top"><span class="ind-name">MACD (12,26,9)</span><span class="tag" id="tagMACD">--</span></div>
+        <div class="ind-value" id="valMACD">--</div>
+        <div class="ind-desc" id="descMACD">--</div>
+      </div>
+      <div class="card ind-card" id="cardADX">
+        <div class="ind-top"><span class="ind-name">ADX (14)</span><span class="tag" id="tagADX">--</span></div>
+        <div class="ind-value" id="valADX">--</div>
+        <div class="ind-desc" id="descADX">--</div>
+      </div>
+      <div class="card ind-card" id="cardCMF">
+        <div class="ind-top"><span class="ind-name">CMF (20)</span><span class="tag" id="tagCMF">--</span></div>
+        <div class="ind-value" id="valCMF">--</div>
+        <div class="ind-desc" id="descCMF">--</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Data via Twelve Data (delayed, free tier). Indicators are computed locally in your browser.<br/>
+    This is an educational technical-analysis tool, not financial advice. Verify independently before trading.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- persisted settings ----------
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const themeBtn = document.getElementById('themeBtn');
+
+  apiKeyInput.value = localStorage.getItem('sta_apikey') || '';
+  apiKeyInput.addEventListener('change', () => localStorage.setItem('sta_apikey', apiKeyInput.value.trim()));
+  settingsBtn.addEventListener('click', () => { settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block'; });
+  if (!apiKeyInput.value) settingsPanel.style.display = 'block';
+
+  function applyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    themeBtn.innerHTML = t === 'dark' ? '&#9728;' : '&#9789;';
+    localStorage.setItem('sta_theme', t);
+  }
+  applyTheme(localStorage.getItem('sta_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  themeBtn.addEventListener('click', () => {
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  // ---------- range chips ----------
+  let selectedRange = '1y';
+  document.querySelectorAll('.range-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.range-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      selectedRange = chip.dataset.range;
+    });
+  });
+
+  // ---------- networking ----------
+  // Twelve Data sends Access-Control-Allow-Origin: * so we can call it directly — no CORS proxy needed.
+  async function fetchJSON(url){
+    let res;
+    try{
+      res = await fetch(url, { cache: 'no-store' });
+    }catch(e){
+      throw new Error('Network request to Twelve Data failed. Check your internet connection and try again.');
+    }
+    let json;
+    try{ json = await res.json(); }
+    catch(e){ throw new Error('Twelve Data returned an unreadable response (HTTP ' + res.status + ').'); }
+    if (json && json.status === 'error'){
+      if (json.code === 429) throw new Error('Twelve Data rate limit reached (free tier: 8 requests/min, 800/day). Wait a moment and try again.');
+      if (json.code === 401 || json.code === 403) throw new Error('Twelve Data rejected the API key. Check the key pasted into Settings.');
+      throw new Error(json.message || ('Twelve Data request failed (HTTP ' + res.status + ').'));
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return json;
+  }
+
+  function getApiKey(){
+    return (localStorage.getItem('sta_apikey') || '').trim();
+  }
+
+  async function resolveSymbol(query, apiKey){
+    const q = query.trim();
+    if (!q) throw new Error('Enter a ticker or company name.');
+    const url = 'https://api.twelvedata.com/symbol_search?symbol=' + encodeURIComponent(q) + '&apikey=' + encodeURIComponent(apiKey);
+    const data = await fetchJSON(url);
+    const list = (data.data || []).filter(x => x.symbol && (x.instrument_type === 'Common Stock' || x.instrument_type === 'ETF'));
+    if (list.length === 0){
+      if (/^[A-Za-z.\-]{1,6}$/.test(q)) return q.toUpperCase();
+      throw new Error('No matching ticker found for "' + q + '".');
+    }
+    const exact = list.find(x => x.symbol.toUpperCase() === q.toUpperCase());
+    if (exact) return exact.symbol;
+    const us = list.find(x => x.country === 'United States');
+    return (us || list[0]).symbol;
+  }
+
+  async function getQuoteAndHistory(symbol, range, apiKey){
+    const outputsize = range === '6mo' ? 140 : range === '2y' ? 540 : 270;
+    const quoteUrl = 'https://api.twelvedata.com/quote?symbol=' + encodeURIComponent(symbol) + '&apikey=' + encodeURIComponent(apiKey);
+    const seriesUrl = 'https://api.twelvedata.com/time_series?symbol=' + encodeURIComponent(symbol) +
+      '&interval=1day&outputsize=' + outputsize + '&apikey=' + encodeURIComponent(apiKey);
+    const [quote, series] = await Promise.all([fetchJSON(quoteUrl), fetchJSON(seriesUrl)]);
+    const values = series.values || [];
+    if (values.length < 40) throw new Error('Not enough historical data for "' + symbol + '" to compute indicators.');
+    const bars = values.slice().reverse().map(v => ({
+      t: new Date(v.datetime).getTime(),
+      open: Number(v.open), high: Number(v.high), low: Number(v.low), close: Number(v.close), volume: Number(v.volume)
+    })).filter(b => [b.high,b.low,b.close,b.volume].every(Number.isFinite));
+    if (bars.length < 40) throw new Error('Not enough historical data for "' + symbol + '" to compute indicators.');
+    return { bars, quote, seriesMeta: series.meta || {} };
+  }
+
+  // ---------- indicator math ----------
+  function ema(values, period){
+    const out = new Array(values.length).fill(null);
+    const k = 2/(period+1);
+    let sum = 0, count = 0, prev = null, started = false;
+    for (let i=0;i<values.length;i++){
+      const v = values[i];
+      if (v == null){ continue; }
+      if (!started){
+        sum += v; count++;
+        if (count === period){ prev = sum/period; out[i] = prev; started = true; }
+      } else {
+        prev = v*k + prev*(1-k);
+        out[i] = prev;
+      }
+    }
+    return out;
+  }
+
+  function computeRSI(closes, period){
+    const out = new Array(closes.length).fill(null);
+    if (closes.length <= period) return out;
+    let gainSum = 0, lossSum = 0;
+    for (let i=1;i<=period;i++){
+      const d = closes[i]-closes[i-1];
+      if (d >= 0) gainSum += d; else lossSum += -d;
+    }
+    let avgGain = gainSum/period, avgLoss = lossSum/period;
+    out[period] = avgLoss === 0 ? 100 : 100 - 100/(1 + avgGain/avgLoss);
+    for (let i=period+1;i<closes.length;i++){
+      const d = closes[i]-closes[i-1];
+      const gain = d > 0 ? d : 0, loss = d < 0 ? -d : 0;
+      avgGain = (avgGain*(period-1)+gain)/period;
+      avgLoss = (avgLoss*(period-1)+loss)/period;
+      out[i] = avgLoss === 0 ? 100 : 100 - 100/(1 + avgGain/avgLoss);
+    }
+    return out;
+  }
+
+  function computeMACD(closes, fast, slow, signalPeriod){
+    const emaFast = ema(closes, fast);
+    const emaSlow = ema(closes, slow);
+    const macdLine = closes.map((_, i) => (emaFast[i]!=null && emaSlow[i]!=null) ? emaFast[i]-emaSlow[i] : null);
+    const signalLine = ema(macdLine, signalPeriod);
+    const hist = closes.map((_, i) => (macdLine[i]!=null && signalLine[i]!=null) ? macdLine[i]-signalLine[i] : null);
+    return { macdLine, signalLine, hist };
+  }
+
+  function computeADX(bars, period){
+    const n = bars.length;
+    const plusDM = new Array(n).fill(0), minusDM = new Array(n).fill(0), tr = new Array(n).fill(0);
+    for (let i=1;i<n;i++){
+      const upMove = bars[i].high - bars[i-1].high;
+      const downMove = bars[i-1].low - bars[i].low;
+      plusDM[i] = (upMove > downMove && upMove > 0) ? upMove : 0;
+      minusDM[i] = (downMove > upMove && downMove > 0) ? downMove : 0;
+      tr[i] = Math.max(
+        bars[i].high - bars[i].low,
+        Math.abs(bars[i].high - bars[i-1].close),
+        Math.abs(bars[i].low - bars[i-1].close)
+      );
+    }
+    const smTR = new Array(n).fill(null), smPlusDM = new Array(n).fill(null), smMinusDM = new Array(n).fill(null);
+    let sumTR=0, sumPlus=0, sumMinus=0;
+    for (let i=1;i<=period;i++){ sumTR+=tr[i]; sumPlus+=plusDM[i]; sumMinus+=minusDM[i]; }
+    smTR[period]=sumTR; smPlusDM[period]=sumPlus; smMinusDM[period]=sumMinus;
+    for (let i=period+1;i<n;i++){
+      smTR[i] = smTR[i-1] - (smTR[i-1]/period) + tr[i];
+      smPlusDM[i] = smPlusDM[i-1] - (smPlusDM[i-1]/period) + plusDM[i];
+      smMinusDM[i] = smMinusDM[i-1] - (smMinusDM[i-1]/period) + minusDM[i];
+    }
+    const plusDI = new Array(n).fill(null), minusDI = new Array(n).fill(null), dx = new Array(n).fill(null);
+    for (let i=period;i<n;i++){
+      if (smTR[i] === null || smTR[i] === 0) continue;
+      plusDI[i] = 100*(smPlusDM[i]/smTR[i]);
+      minusDI[i] = 100*(smMinusDM[i]/smTR[i]);
+      const sum = plusDI[i]+minusDI[i];
+      dx[i] = sum === 0 ? 0 : 100*Math.abs(plusDI[i]-minusDI[i])/sum;
+    }
+    const adx = new Array(n).fill(null);
+    const firstDxIdx = period, adxSeedIdx = period*2;
+    if (adxSeedIdx < n){
+      let sumDx=0, c=0;
+      for (let i=firstDxIdx;i<adxSeedIdx;i++){ if (dx[i]!=null){ sumDx+=dx[i]; c++; } }
+      if (c>0){
+        adx[adxSeedIdx-1] = sumDx/c;
+        for (let i=adxSeedIdx;i<n;i++){
+          if (dx[i]==null || adx[i-1]==null) continue;
+          adx[i] = (adx[i-1]*(period-1)+dx[i])/period;
+        }
+      }
+    }
+    return { plusDI, minusDI, adx };
+  }
+
+  function computeCMF(bars, period){
+    const n = bars.length;
+    if (n < period) return null;
+    let mfvSum = 0, volSum = 0;
+    for (let i=n-period;i<n;i++){
+      const b = bars[i];
+      const range = b.high - b.low;
+      const mfm = range === 0 ? 0 : ((b.close - b.low) - (b.high - b.close)) / range;
+      mfvSum += mfm * b.volume;
+      volSum += b.volume;
+    }
+    return volSum === 0 ? 0 : mfvSum/volSum;
+  }
+
+  function lastValid(arr){
+    for (let i=arr.length-1;i>=0;i--){ if (arr[i]!=null && !Number.isNaN(arr[i])) return arr[i]; }
+    return null;
+  }
+
+  // ---------- classification & scoring ----------
+  function classifyRSI(v){
+    if (v == null) return { signal:'neutral', label:'N/A', score:0, desc:'Not enough data.' };
+    if (v >= 70) return { signal:'bear', label:'Overbought', score:-0.7, desc: 'RSI ' + v.toFixed(1) + ' is above 70, suggesting the stock is overbought and may be due for a pullback.' };
+    if (v <= 30) return { signal:'bull', label:'Oversold', score:0.7, desc: 'RSI ' + v.toFixed(1) + ' is below 30, suggesting the stock is oversold and may be due for a bounce.' };
+    if (v >= 55) return { signal:'bull', label:'Mild bullish', score:0.3, desc: 'RSI ' + v.toFixed(1) + ' is above the 50 midline, showing positive momentum.' };
+    if (v <= 45) return { signal:'bear', label:'Mild bearish', score:-0.3, desc: 'RSI ' + v.toFixed(1) + ' is below the 50 midline, showing negative momentum.' };
+    return { signal:'neutral', label:'Neutral', score:0, desc: 'RSI ' + v.toFixed(1) + ' is near the 50 midline, showing no strong momentum bias.' };
+  }
+
+  function classifyMACD(macd, signal, hist, price){
+    if (macd == null || signal == null) return { signal:'neutral', label:'N/A', score:0, desc:'Not enough data.' };
+    const aboveZero = macd > 0;
+    const bullishCross = macd > signal;
+    let sig, label, score;
+    if (bullishCross && aboveZero){ sig='bull'; label='Bullish'; score=1; }
+    else if (bullishCross && !aboveZero){ sig='bull'; label='Improving'; score=0.4; }
+    else if (!bullishCross && aboveZero){ sig='bear'; label='Weakening'; score=-0.4; }
+    else { sig='bear'; label='Bearish'; score=-1; }
+    const desc = 'MACD line (' + macd.toFixed(3) + ') is ' + (bullishCross?'above':'below') + ' the signal line (' + signal.toFixed(3) + '), and ' +
+      (aboveZero ? 'above' : 'below') + ' the zero line, with a histogram of ' + hist.toFixed(3) + '.';
+    return { signal: sig, label, score, desc };
+  }
+
+  function classifyADX(adx, plusDI, minusDI){
+    if (adx == null || plusDI == null || minusDI == null) return { signal:'neutral', label:'N/A', score:0, desc:'Not enough data.' };
+    const dirUp = plusDI > minusDI;
+    const strength = Math.max(0, Math.min(1, adx/50));
+    let sig, label;
+    if (adx < 20){ sig='neutral'; label='No trend'; }
+    else if (adx < 25){ sig = dirUp?'bull':'bear'; label = 'Emerging trend'; }
+    else if (adx < 40){ sig = dirUp?'bull':'bear'; label = 'Strong trend'; }
+    else { sig = dirUp?'bull':'bear'; label = 'Very strong trend'; }
+    const dirScore = (plusDI+minusDI) === 0 ? 0 : (plusDI-minusDI)/(plusDI+minusDI);
+    const score = adx < 20 ? dirScore*0.15 : dirScore*strength;
+    const desc = 'ADX ' + adx.toFixed(1) + ' with +DI ' + plusDI.toFixed(1) + ' / -DI ' + minusDI.toFixed(1) +
+      ' indicates ' + (adx<20?'a weak or absent trend':(dirUp?'an upward-directed trend':'a downward-directed trend')) + '.';
+    return { signal: sig, label, score, desc };
+  }
+
+  function classifyCMF(v){
+    if (v == null) return { signal:'neutral', label:'N/A', score:0, desc:'Not enough data.' };
+    const score = Math.max(-1, Math.min(1, v/0.2));
+    let sig, label;
+    if (v >= 0.05){ sig='bull'; label='Buying pressure'; }
+    else if (v <= -0.05){ sig='bear'; label='Selling pressure'; }
+    else { sig='neutral'; label='Balanced'; }
+    const desc = 'CMF ' + v.toFixed(3) + ' over the last 20 sessions indicates ' +
+      (v>=0.05?'net buying (accumulation) pressure':(v<=-0.05?'net selling (distribution) pressure':'roughly balanced money flow')) + '.';
+    return { signal: sig, label, score, desc };
+  }
+
+  // MACD is price/momentum-based, CMF is volume-based; when they disagree the bullish/bearish
+  // read is less trustworthy even if the raw weighted score looks strong, so damp it accordingly.
+  function detectMacdCmfDivergence(ind){
+    if (ind.macd.label === 'N/A' || ind.cmf.label === 'N/A') return { type:'unavailable', dampFactor:1, macdDir:null, cmfDir:null };
+    const macdDir = ind.macd.signal, cmfDir = ind.cmf.signal;
+    if (cmfDir === macdDir) return { type:'confirmed', dampFactor:1, macdDir, cmfDir };
+    if (cmfDir === 'neutral') return { type:'unconfirmed', dampFactor:0.88, macdDir, cmfDir };
+    return { type:'opposing', dampFactor:0.7, macdDir, cmfDir };
+  }
+
+  function overallVerdict(indicators){
+    const weights = { rsi:1, macd:1.2, adx:1, cmf:0.8 };
+    let sumScore=0, sumW=0;
+    for (const k in weights){ sumScore += indicators[k].score*weights[k]; sumW += weights[k]; }
+    const rawScore = sumW===0?0:sumScore/sumW;
+    const divergence = detectMacdCmfDivergence(indicators);
+    const score = rawScore * divergence.dampFactor;
+    let verdict, cls;
+    if (score >= 0.5){ verdict='Strong Buy'; cls='bull'; }
+    else if (score >= 0.15){ verdict='Buy'; cls='bull'; }
+    else if (score > -0.15){ verdict='Hold / Neutral'; cls='neutral'; }
+    else if (score > -0.5){ verdict='Sell'; cls='bear'; }
+    else { verdict='Strong Sell'; cls='bear'; }
+    return { score, verdict, cls, divergence };
+  }
+
+  function buildSummary(symbol, ind, verdict){
+    const votes = ['rsi','macd','adx','cmf'];
+    const bullCount = votes.filter(k => ind[k].signal==='bull').length;
+    const bearCount = votes.filter(k => ind[k].signal==='bear').length;
+    let lead = symbol + ': ' + bullCount + ' of 4 indicators lean bullish and ' + bearCount + ' lean bearish' +
+      (bullCount+bearCount<4 ? ' (the rest are neutral)' : '') + '. ';
+    let trendPart = ind.adx.label === 'No trend'
+      ? 'The ADX shows no clearly established trend right now, so directional signals from RSI/MACD/CMF carry less conviction. '
+      : 'ADX confirms a ' + ind.adx.label.toLowerCase() + (ind.adx.signal==='bull' ? ' to the upside' : ind.adx.signal==='bear' ? ' to the downside' : '') + '. ';
+    let momentumPart = 'Momentum (RSI) is ' + ind.rsi.label.toLowerCase() + ' and MACD is ' + ind.macd.label.toLowerCase() + '. ';
+    let flowPart = 'Money flow (CMF) shows ' + ind.cmf.label.toLowerCase() + '. ';
+    let confirmationPart = '';
+    if (verdict.divergence.type === 'opposing' || verdict.divergence.type === 'unconfirmed'){
+      const macdWord = verdict.divergence.macdDir === 'bull' ? 'bullish' : 'bearish';
+      confirmationPart = verdict.divergence.type === 'opposing'
+        ? 'Note: MACD (' + macdWord + ') and CMF are pointing in opposite directions — price momentum and money flow disagree, which meaningfully lowers conviction in this signal. '
+        : 'Note: money flow (CMF) isn\'t confirming MACD\'s ' + macdWord + ' momentum, which tempers conviction in this signal. ';
+    }
+    let verdictPart = 'Combined, this points to an overall verdict of ' + verdict.verdict + '.';
+    return lead + trendPart + momentumPart + flowPart + confirmationPart + verdictPart;
+  }
+
+  // ---------- UI helpers ----------
+  const statusEl = document.getElementById('status');
+  function showStatus(msg, type){
+    statusEl.textContent = msg;
+    statusEl.className = type;
+  }
+  function hideStatus(){ statusEl.className = ''; statusEl.textContent=''; }
+
+  function setTag(el, cls, text){
+    el.textContent = text;
+    el.className = 'tag ' + cls;
+  }
+
+  function drawSpark(svg, closes){
+    const w = 600, h = 70, pad = 4;
+    const min = Math.min(...closes), max = Math.max(...closes);
+    const range = (max-min) || 1;
+    const step = (w-2*pad)/(closes.length-1);
+    let d = '';
+    closes.forEach((c,i) => {
+      const x = pad + i*step;
+      const y = h - pad - ((c-min)/range)*(h-2*pad);
+      d += (i===0?'M':'L') + x.toFixed(2) + ',' + y.toFixed(2) + ' ';
+    });
+    const up = closes[closes.length-1] >= closes[0];
+    svg.innerHTML = '<path d="' + d.trim() + '" fill="none" stroke="' + (up?'var(--bull)':'var(--bear)') + '" stroke-width="2" vector-effect="non-scaling-stroke"/>';
+  }
+
+  // ---------- main flow ----------
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const tickerInput = document.getElementById('tickerInput');
+  const resultsEl = document.getElementById('results');
+
+  async function runAnalysis(){
+    const query = tickerInput.value.trim();
+    if (!query){ showStatus('Please enter a ticker symbol or company name.', 'error'); return; }
+    const apiKey = getApiKey();
+    if (!apiKey){
+      showStatus('Add a free Twelve Data API key in Settings (gear icon) before analyzing — get one at twelvedata.com/pricing, no card required.', 'error');
+      settingsPanel.style.display = 'block';
+      apiKeyInput.focus();
+      return;
+    }
+    resultsEl.style.display = 'none';
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerHTML = '<span class="spinner"></span>Analyzing...';
+    showStatus('Looking up "' + query + '"...', 'info');
+    try{
+      const symbol = await resolveSymbol(query, apiKey);
+      showStatus('Fetching price history for ' + symbol + '...', 'info');
+      const { bars, quote, seriesMeta } = await getQuoteAndHistory(symbol, selectedRange, apiKey);
+      showStatus('Computing indicators...', 'info');
+
+      const closes = bars.map(b => b.close);
+      const rsiArr = computeRSI(closes, 14);
+      const { macdLine, signalLine, hist } = computeMACD(closes, 12, 26, 9);
+      const { plusDI, minusDI, adx } = computeADX(bars, 14);
+      const cmfVal = computeCMF(bars, 20);
+
+      const rsiVal = lastValid(rsiArr);
+      const macdVal = lastValid(macdLine);
+      const signalVal = lastValid(signalLine);
+      const histVal = lastValid(hist);
+      const adxVal = lastValid(adx);
+      const plusDIVal = lastValid(plusDI);
+      const minusDIVal = lastValid(minusDI);
+
+      const ind = {
+        rsi: classifyRSI(rsiVal),
+        macd: classifyMACD(macdVal, signalVal, histVal, closes[closes.length-1]),
+        adx: classifyADX(adxVal, plusDIVal, minusDIVal),
+        cmf: classifyCMF(cmfVal)
+      };
+      const verdict = overallVerdict(ind);
+
+      // quote header
+      const price = Number(quote.close);
+      const prevClose = Number(quote.previous_close) || closes[closes.length-2];
+      const chg = Number.isFinite(Number(quote.change)) ? Number(quote.change) : price - prevClose;
+      const chgPct = Number.isFinite(Number(quote.percent_change)) ? Number(quote.percent_change) : (prevClose ? (chg/prevClose*100) : 0);
+      const displaySymbol = quote.symbol || seriesMeta.symbol || symbol;
+      document.getElementById('qSymbol').textContent = displaySymbol;
+      document.getElementById('qName').textContent = quote.name || '';
+      document.getElementById('qPrice').textContent = (seriesMeta.currency || quote.currency || '') + ' ' + price.toFixed(2);
+      const chEl = document.getElementById('qChange');
+      chEl.textContent = (chg>=0?'+':'') + chg.toFixed(2) + ' (' + (chg>=0?'+':'') + chgPct.toFixed(2) + '%)';
+      chEl.className = 'change ' + (chg>=0?'up':'down');
+      drawSpark(document.getElementById('sparkSvg'), closes.slice(-120));
+
+      // verdict card
+      const vb = document.getElementById('verdictBadge');
+      vb.textContent = verdict.verdict;
+      vb.style.background = verdict.cls==='bull'?'var(--bull-bg)':verdict.cls==='bear'?'var(--bear-bg)':'var(--neutral-bg)';
+      vb.style.color = verdict.cls==='bull'?'var(--bull)':verdict.cls==='bear'?'var(--bear)':'var(--neutral)';
+      document.getElementById('verdictScore').textContent = 'Composite score: ' + verdict.score.toFixed(2) + ' (range -1.00 bearish to +1.00 bullish)';
+      const pct = ((verdict.score+1)/2)*100;
+      document.getElementById('scoreMarker').style.left = pct + '%';
+      document.getElementById('summaryText').textContent = buildSummary(displaySymbol, ind, verdict);
+
+      // indicator cards
+      setTag(document.getElementById('tagRSI'), ind.rsi.signal, ind.rsi.label);
+      document.getElementById('valRSI').textContent = rsiVal!=null ? rsiVal.toFixed(1) : 'N/A';
+      document.getElementById('descRSI').textContent = ind.rsi.desc;
+
+      setTag(document.getElementById('tagMACD'), ind.macd.signal, ind.macd.label);
+      document.getElementById('valMACD').textContent = macdVal!=null ? macdVal.toFixed(3) : 'N/A';
+      document.getElementById('descMACD').textContent = ind.macd.desc;
+
+      setTag(document.getElementById('tagADX'), ind.adx.signal, ind.adx.label);
+      document.getElementById('valADX').textContent = adxVal!=null ? adxVal.toFixed(1) : 'N/A';
+      document.getElementById('descADX').textContent = ind.adx.desc;
+
+      setTag(document.getElementById('tagCMF'), ind.cmf.signal, ind.cmf.label);
+      document.getElementById('valCMF').textContent = cmfVal!=null ? cmfVal.toFixed(3) : 'N/A';
+      document.getElementById('descCMF').textContent = ind.cmf.desc;
+
+      hideStatus();
+      resultsEl.style.display = 'block';
+    }catch(err){
+      showStatus(err.message || 'Something went wrong.', 'error');
+    }finally{
+      analyzeBtn.disabled = false;
+      analyzeBtn.textContent = 'Analyze';
+    }
+  }
+
+  analyzeBtn.addEventListener('click', runAnalysis);
+  tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') runAnalysis(); });
+})();
+</script>
+</body>
+</html>
