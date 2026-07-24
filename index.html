@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.twelvedata.com; base-uri 'none'; form-action 'none'; object-src 'none';">
 <title>Stock Technical Analyzer</title>
 <style>
   :root{
@@ -144,8 +146,11 @@
   <div id="settingsPanel">
     <strong>Settings</strong>
     <label for="apiKeyInput">Twelve Data API key</label>
-    <input id="apiKeyInput" type="text" placeholder="Paste your API key" autocomplete="off" />
-    <div class="hint">Free, no card required &mdash; get one at <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">twelvedata.com/pricing</a>. Stored only in this browser (localStorage), never sent anywhere but Twelve Data.</div>
+    <div style="display:flex;gap:6px;">
+      <input id="apiKeyInput" type="password" placeholder="Paste your API key" autocomplete="off" style="flex:1;" />
+      <button type="button" class="icon-btn" id="toggleKeyBtn" style="width:auto;padding:0 12px;" title="Show/hide key">&#128065;</button>
+    </div>
+    <div class="hint">Free, no card required &mdash; get one at <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener noreferrer">twelvedata.com/pricing</a>. Stored only in this browser (localStorage), never sent anywhere but Twelve Data.</div>
   </div>
 
   <div id="status"></div>
@@ -208,12 +213,14 @@
 
   // ---------- persisted settings ----------
   const apiKeyInput = document.getElementById('apiKeyInput');
+  const toggleKeyBtn = document.getElementById('toggleKeyBtn');
   const settingsPanel = document.getElementById('settingsPanel');
   const settingsBtn = document.getElementById('settingsBtn');
   const themeBtn = document.getElementById('themeBtn');
 
   apiKeyInput.value = localStorage.getItem('sta_apikey') || '';
   apiKeyInput.addEventListener('change', () => localStorage.setItem('sta_apikey', apiKeyInput.value.trim()));
+  toggleKeyBtn.addEventListener('click', () => { apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password'; });
   settingsBtn.addEventListener('click', () => { settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block'; });
   if (!apiKeyInput.value) settingsPanel.style.display = 'block';
 
