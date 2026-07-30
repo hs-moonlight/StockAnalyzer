@@ -73,6 +73,22 @@
     background:var(--bg);color:var(--text);font-size:.85rem;}
   #settingsPanel .hint{font-size:.72rem;color:var(--muted);margin-top:4px;}
   #settingsPanel .row{display:flex;gap:8px;align-items:center;margin-top:12px;}
+  .hint{font-size:.72rem;color:var(--muted);margin-top:4px;}
+
+  #watchlistCard{margin-bottom:16px;}
+  .watchlist-head{display:flex;justify-content:space-between;align-items:center;}
+  #watchlistEditRow{margin-top:10px;}
+  #watchlistInput{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--border);
+    background:var(--bg);color:var(--text);font-size:.85rem;font-family:inherit;resize:vertical;}
+  .watchlist-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  #runAllBtn{padding:12px 20px;border-radius:12px;border:none;background:var(--accent);
+    color:var(--accent-ink);font-size:.92rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+  #runAllBtn:disabled{opacity:.6;cursor:default;}
+  #copyColumnBtn:disabled{opacity:.5;cursor:default;}
+  #watchlistStatus{font-size:.82rem;color:var(--muted);margin-top:10px;}
+  #watchlistTable{display:none;width:100%;margin-top:14px;border-collapse:collapse;font-size:.85rem;}
+  #watchlistTable th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);padding:6px 4px;}
+  #watchlistTable td{padding:7px 4px;border-bottom:1px solid var(--border);}
 
   #status{padding:14px 16px;border-radius:12px;font-size:.9rem;margin-bottom:16px;display:none;}
   #status.info{background:var(--panel);border:1px solid var(--border);color:var(--muted);display:block;}
@@ -141,6 +157,26 @@
     <div class="range-chip" data-range="6mo">6M</div>
     <div class="range-chip active" data-range="1y">1Y</div>
     <div class="range-chip" data-range="2y">2Y</div>
+  </div>
+
+  <div class="card" id="watchlistCard">
+    <div class="watchlist-head">
+      <strong>Watchlist</strong>
+      <button type="button" class="icon-btn" id="editWatchlistBtn" style="width:auto;padding:0 12px;font-size:.8rem;" title="Edit tickers">Edit</button>
+    </div>
+    <div id="watchlistEditRow" style="display:none;">
+      <textarea id="watchlistInput" rows="2" placeholder="Comma-separated tickers, e.g. AAPL, MSFT, TSLA"></textarea>
+      <div class="hint">Comma-separated tickers, saved automatically in this browser. These are known-good symbols only &mdash; no company-name lookup, to save API calls.</div>
+    </div>
+    <div class="watchlist-actions">
+      <button type="button" id="runAllBtn">Run All</button>
+      <button type="button" class="icon-btn" id="copyColumnBtn" style="width:auto;padding:0 14px;" disabled>Copy Today's Column</button>
+    </div>
+    <div id="watchlistStatus"></div>
+    <table id="watchlistTable">
+      <thead><tr><th>Ticker</th><th>Price</th><th>Verdict</th></tr></thead>
+      <tbody id="watchlistTbody"></tbody>
+    </table>
   </div>
 
   <div id="settingsPanel">
@@ -410,6 +446,34 @@
     return null;
   }
 
+  // Shared by the single-ticker flow and the watchlist batch flow, so both always compute
+  // indicators identically -- one code path, no risk of the two silently drifting apart.
+  function computeIndicators(bars){
+    const closes = bars.map(b => b.close);
+    const rsiArr = computeRSI(closes, 14);
+    const { macdLine, signalLine, hist } = computeMACD(closes, 12, 26, 9);
+    const { plusDI, minusDI, adx } = computeADX(bars, 14);
+    const cmfVal = computeCMF(bars, 20);
+
+    const rsiVal = lastValid(rsiArr);
+    const macdVal = lastValid(macdLine);
+    const signalVal = lastValid(signalLine);
+    const histVal = lastValid(hist);
+    const adxVal = lastValid(adx);
+    const plusDIVal = lastValid(plusDI);
+    const minusDIVal = lastValid(minusDI);
+    const macdCross = findRecentCrossover(macdLine, signalLine, 10);
+    const diCross = findRecentCrossover(plusDI, minusDI, 10);
+
+    const ind = {
+      rsi: classifyRSI(rsiVal),
+      macd: classifyMACD(macdVal, signalVal, histVal, closes[closes.length-1], macdCross),
+      adx: classifyADX(adxVal, plusDIVal, minusDIVal, diCross),
+      cmf: classifyCMF(cmfVal)
+    };
+    return { closes, ind, rsiVal, macdVal, adxVal, cmfVal };
+  }
+
   // Scans backward from the most recent bar for the last point seriesA crossed seriesB,
   // within `lookback` sessions. A crossover is a fresh, actionable timing event; the current
   // state alone (which is already bigger) doesn't tell you whether that's new information.
@@ -586,28 +650,7 @@
       const { bars, quote, seriesMeta } = await getQuoteAndHistory(symbol, selectedRange, apiKey);
       showStatus('Computing indicators...', 'info');
 
-      const closes = bars.map(b => b.close);
-      const rsiArr = computeRSI(closes, 14);
-      const { macdLine, signalLine, hist } = computeMACD(closes, 12, 26, 9);
-      const { plusDI, minusDI, adx } = computeADX(bars, 14);
-      const cmfVal = computeCMF(bars, 20);
-
-      const rsiVal = lastValid(rsiArr);
-      const macdVal = lastValid(macdLine);
-      const signalVal = lastValid(signalLine);
-      const histVal = lastValid(hist);
-      const adxVal = lastValid(adx);
-      const plusDIVal = lastValid(plusDI);
-      const minusDIVal = lastValid(minusDI);
-      const macdCross = findRecentCrossover(macdLine, signalLine, 10);
-      const diCross = findRecentCrossover(plusDI, minusDI, 10);
-
-      const ind = {
-        rsi: classifyRSI(rsiVal),
-        macd: classifyMACD(macdVal, signalVal, histVal, closes[closes.length-1], macdCross),
-        adx: classifyADX(adxVal, plusDIVal, minusDIVal, diCross),
-        cmf: classifyCMF(cmfVal)
-      };
+      const { closes, ind, rsiVal, macdVal, adxVal, cmfVal } = computeIndicators(bars);
       const verdict = overallVerdict(ind);
 
       // quote header
@@ -663,6 +706,140 @@
 
   analyzeBtn.addEventListener('click', runAnalysis);
   tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') runAnalysis(); });
+
+  // ---------- watchlist / batch flow ----------
+  const DEFAULT_WATCHLIST = ['A','ABBV','AEP','ALL','AMAT','AMGN','AMZN','ANET','AAPL','AZN'];
+  const VERDICT_ABBREV = { 'Strong Buy':'SB', 'Buy':'Buy', 'Hold / Neutral':'Hold', 'Sell':'Sell', 'Strong Sell':'SS' };
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  function getWatchlist(){
+    try{
+      const raw = localStorage.getItem('sta_watchlist');
+      if (!raw) return DEFAULT_WATCHLIST.slice();
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) && arr.length ? arr : DEFAULT_WATCHLIST.slice();
+    }catch(e){ return DEFAULT_WATCHLIST.slice(); }
+  }
+
+  function parseWatchlistInput(text){
+    return text.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  }
+
+  const watchlistInput = document.getElementById('watchlistInput');
+  const editWatchlistBtn = document.getElementById('editWatchlistBtn');
+  const watchlistEditRow = document.getElementById('watchlistEditRow');
+  const runAllBtn = document.getElementById('runAllBtn');
+  const copyColumnBtn = document.getElementById('copyColumnBtn');
+  const watchlistStatusEl = document.getElementById('watchlistStatus');
+  const watchlistTable = document.getElementById('watchlistTable');
+  const watchlistTbody = document.getElementById('watchlistTbody');
+
+  watchlistInput.value = getWatchlist().join(', ');
+  editWatchlistBtn.addEventListener('click', () => {
+    watchlistEditRow.style.display = watchlistEditRow.style.display === 'block' ? 'none' : 'block';
+  });
+  watchlistInput.addEventListener('change', () => {
+    const tickers = parseWatchlistInput(watchlistInput.value);
+    localStorage.setItem('sta_watchlist', JSON.stringify(tickers));
+    watchlistInput.value = tickers.join(', ');
+  });
+
+  function showWatchlistStatus(msg, type){
+    watchlistStatusEl.textContent = msg;
+    watchlistStatusEl.style.color = type === 'error' ? 'var(--bear)' : 'var(--muted)';
+  }
+
+  let lastBatchResults = [];
+
+  function renderWatchlistTable(results){
+    watchlistTbody.textContent = '';
+    results.forEach(r => {
+      const tr = document.createElement('tr');
+      const tdSymbol = document.createElement('td');
+      tdSymbol.style.fontWeight = '600';
+      tdSymbol.textContent = r.symbol;
+      tr.appendChild(tdSymbol);
+      if (r.error){
+        const tdErr = document.createElement('td');
+        tdErr.colSpan = 2;
+        tdErr.style.color = 'var(--bear)';
+        tdErr.textContent = 'Error: ' + r.error;
+        tr.appendChild(tdErr);
+      } else {
+        const tdPrice = document.createElement('td');
+        tdPrice.textContent = r.currency + ' ' + r.price.toFixed(2);
+        tr.appendChild(tdPrice);
+
+        const tdVerdict = document.createElement('td');
+        const span = document.createElement('span');
+        span.className = 'tag ' + (r.cls === 'bull' ? 'bull' : r.cls === 'bear' ? 'bear' : 'neutral');
+        span.textContent = r.verdict;
+        tdVerdict.appendChild(span);
+        tr.appendChild(tdVerdict);
+      }
+      watchlistTbody.appendChild(tr);
+    });
+    watchlistTable.style.display = results.length ? 'table' : 'none';
+  }
+
+  async function runBatchAnalysis(){
+    const apiKey = getApiKey();
+    if (!apiKey){
+      showWatchlistStatus('Add a free Twelve Data API key in Settings before running the watchlist.', 'error');
+      settingsPanel.style.display = 'block';
+      apiKeyInput.focus();
+      return;
+    }
+    const tickers = getWatchlist();
+    if (tickers.length === 0){ showWatchlistStatus('Add at least one ticker to the watchlist.', 'error'); return; }
+
+    runAllBtn.disabled = true;
+    copyColumnBtn.disabled = true;
+    lastBatchResults = [];
+    renderWatchlistTable(lastBatchResults);
+
+    // Two API calls per ticker (quote + time_series; no symbol search since these are already
+    // known-good tickers). Twelve Data's free tier caps at 8 requests/minute, so pace 16s between
+    // tickers -- 2 calls per 16s = 7.5/min, comfortably under the limit with margin.
+    const PACE_MS = 16000;
+    for (let i = 0; i < tickers.length; i++){
+      const symbol = tickers[i];
+      showWatchlistStatus('Checking ' + (i+1) + ' of ' + tickers.length + ': ' + symbol + '...', 'info');
+      try{
+        const { bars, quote, seriesMeta } = await getQuoteAndHistory(symbol, selectedRange, apiKey);
+        const { ind } = computeIndicators(bars);
+        const verdict = overallVerdict(ind);
+        lastBatchResults.push({
+          symbol: quote.symbol || symbol,
+          price: Number(quote.close),
+          currency: seriesMeta.currency || quote.currency || '',
+          verdict: verdict.verdict,
+          cls: verdict.cls,
+          error: null
+        });
+      }catch(err){
+        lastBatchResults.push({ symbol, error: err.message || 'Failed' });
+      }
+      renderWatchlistTable(lastBatchResults);
+      if (i < tickers.length - 1) await sleep(PACE_MS);
+    }
+
+    const failCount = lastBatchResults.filter(r => r.error).length;
+    showWatchlistStatus('Done. Checked ' + tickers.length + ' ticker(s)' + (failCount ? (', ' + failCount + ' failed') : '') + '.', failCount ? 'error' : 'info');
+    runAllBtn.disabled = false;
+    copyColumnBtn.disabled = lastBatchResults.every(r => r.error);
+  }
+
+  runAllBtn.addEventListener('click', runBatchAnalysis);
+  copyColumnBtn.addEventListener('click', () => {
+    const lines = lastBatchResults.map(r => r.error ? '' : (VERDICT_ABBREV[r.verdict] || r.verdict) + ' $' + r.price.toFixed(2));
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      const original = copyColumnBtn.textContent;
+      copyColumnBtn.textContent = 'Copied!';
+      setTimeout(() => { copyColumnBtn.textContent = original; }, 1500);
+    }).catch(() => showWatchlistStatus('Could not copy to clipboard — your browser may be blocking clipboard access.', 'error'));
+  });
 })();
 </script>
 </body>
