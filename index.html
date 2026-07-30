@@ -410,6 +410,27 @@
     return null;
   }
 
+  // Scans backward from the most recent bar for the last point seriesA crossed seriesB,
+  // within `lookback` sessions. A crossover is a fresh, actionable timing event; the current
+  // state alone (which is already bigger) doesn't tell you whether that's new information.
+  function findRecentCrossover(seriesA, seriesB, lookback){
+    const n = seriesA.length;
+    for (let i = n-1; i >= 1 && (n-1-i) < lookback; i--){
+      const a0 = seriesA[i-1], b0 = seriesB[i-1], a1 = seriesA[i], b1 = seriesB[i];
+      if (a0 == null || b0 == null || a1 == null || b1 == null) continue;
+      if (a0 <= b0 && a1 > b1) return { daysAgo: n-1-i, direction: 'bull' };
+      if (a0 >= b0 && a1 < b1) return { daysAgo: n-1-i, direction: 'bear' };
+    }
+    return null;
+  }
+
+  function crossoverText(cross, lookback, upLabel, downLabel){
+    if (!cross) return 'No crossover in the last ' + lookback + ' sessions.';
+    const dirText = cross.direction === 'bull' ? upLabel : downLabel;
+    const whenText = cross.daysAgo === 0 ? 'today (most recent session)' : cross.daysAgo === 1 ? '1 session ago' : cross.daysAgo + ' sessions ago';
+    return dirText + ' ' + whenText + '.';
+  }
+
   // ---------- classification & scoring ----------
   function classifyRSI(v){
     if (v == null) return { signal:'neutral', label:'N/A', score:0, desc:'Not enough data.' };
@@ -420,7 +441,7 @@
     return { signal:'neutral', label:'Neutral', score:0, desc: 'RSI ' + v.toFixed(1) + ' is near the 50 midline, showing no strong momentum bias.' };
   }
 
-  function classifyMACD(macd, signal, hist, price){
+  function classifyMACD(macd, signal, hist, price, cross){
     if (macd == null || signal == null) return { signal:'neutral', label:'N/A', score:0, desc:'Not enough data.' };
     const aboveZero = macd > 0;
     const bullishCross = macd > signal;
@@ -430,11 +451,12 @@
     else if (!bullishCross && aboveZero){ sig='bear'; label='Weakening'; score=-0.4; }
     else { sig='bear'; label='Bearish'; score=-1; }
     const desc = 'MACD line (' + macd.toFixed(3) + ') is ' + (bullishCross?'above':'below') + ' the signal line (' + signal.toFixed(3) + '), and ' +
-      (aboveZero ? 'above' : 'below') + ' the zero line, with a histogram of ' + hist.toFixed(3) + '.';
-    return { signal: sig, label, score, desc };
+      (aboveZero ? 'above' : 'below') + ' the zero line, with a histogram of ' + hist.toFixed(3) + '. ' +
+      crossoverText(cross, 10, 'MACD crossed above its signal line', 'MACD crossed below its signal line');
+    return { signal: sig, label, score, desc, cross };
   }
 
-  function classifyADX(adx, plusDI, minusDI){
+  function classifyADX(adx, plusDI, minusDI, cross){
     if (adx == null || plusDI == null || minusDI == null) return { signal:'neutral', label:'N/A', score:0, desc:'Not enough data.' };
     const dirUp = plusDI > minusDI;
     const strength = Math.max(0, Math.min(1, adx/50));
@@ -446,8 +468,9 @@
     const dirScore = (plusDI+minusDI) === 0 ? 0 : (plusDI-minusDI)/(plusDI+minusDI);
     const score = adx < 20 ? dirScore*0.15 : dirScore*strength;
     const desc = 'ADX ' + adx.toFixed(1) + ' with +DI ' + plusDI.toFixed(1) + ' / -DI ' + minusDI.toFixed(1) +
-      ' indicates ' + (adx<20?'a weak or absent trend':(dirUp?'an upward-directed trend':'a downward-directed trend')) + '.';
-    return { signal: sig, label, score, desc };
+      ' indicates ' + (adx<20?'a weak or absent trend':(dirUp?'an upward-directed trend':'a downward-directed trend')) + '. ' +
+      crossoverText(cross, 10, '+DI crossed above -DI', '-DI crossed above +DI');
+    return { signal: sig, label, score, desc, cross };
   }
 
   function classifyCMF(v){
@@ -576,11 +599,13 @@
       const adxVal = lastValid(adx);
       const plusDIVal = lastValid(plusDI);
       const minusDIVal = lastValid(minusDI);
+      const macdCross = findRecentCrossover(macdLine, signalLine, 10);
+      const diCross = findRecentCrossover(plusDI, minusDI, 10);
 
       const ind = {
         rsi: classifyRSI(rsiVal),
-        macd: classifyMACD(macdVal, signalVal, histVal, closes[closes.length-1]),
-        adx: classifyADX(adxVal, plusDIVal, minusDIVal),
+        macd: classifyMACD(macdVal, signalVal, histVal, closes[closes.length-1], macdCross),
+        adx: classifyADX(adxVal, plusDIVal, minusDIVal, diCross),
         cmf: classifyCMF(cmfVal)
       };
       const verdict = overallVerdict(ind);
