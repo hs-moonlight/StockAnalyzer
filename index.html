@@ -159,26 +159,6 @@
     <div class="range-chip" data-range="2y">2Y</div>
   </div>
 
-  <div class="card" id="watchlistCard">
-    <div class="watchlist-head">
-      <strong>Watchlist</strong>
-      <button type="button" class="icon-btn" id="editWatchlistBtn" style="width:auto;padding:0 12px;font-size:.8rem;" title="Edit tickers">Edit</button>
-    </div>
-    <div id="watchlistEditRow" style="display:none;">
-      <textarea id="watchlistInput" rows="2" placeholder="Comma-separated tickers, e.g. AAPL, MSFT, TSLA"></textarea>
-      <div class="hint">Comma-separated tickers, saved automatically in this browser. These are known-good symbols only &mdash; no company-name lookup, to save API calls.</div>
-    </div>
-    <div class="watchlist-actions">
-      <button type="button" id="runAllBtn">Run All</button>
-      <button type="button" class="icon-btn" id="copyColumnBtn" style="width:auto;padding:0 14px;" disabled>Copy Today's Column</button>
-    </div>
-    <div id="watchlistStatus"></div>
-    <table id="watchlistTable">
-      <thead><tr><th>Ticker</th><th>Price</th><th>Verdict</th></tr></thead>
-      <tbody id="watchlistTbody"></tbody>
-    </table>
-  </div>
-
   <div id="settingsPanel">
     <strong>Settings</strong>
     <label for="apiKeyInput">Twelve Data API key</label>
@@ -235,6 +215,26 @@
         <div class="ind-desc" id="descCMF">--</div>
       </div>
     </div>
+  </div>
+
+  <div class="card" id="watchlistCard">
+    <div class="watchlist-head">
+      <strong>Watchlist</strong>
+      <button type="button" class="icon-btn" id="editWatchlistBtn" style="width:auto;padding:0 12px;font-size:.8rem;" title="Edit tickers">Edit</button>
+    </div>
+    <div id="watchlistEditRow" style="display:none;">
+      <textarea id="watchlistInput" rows="2" placeholder="Comma-separated tickers, e.g. AAPL, MSFT, TSLA"></textarea>
+      <div class="hint">Comma-separated tickers, saved automatically in this browser. These are known-good symbols only &mdash; no company-name lookup, to save API calls.</div>
+    </div>
+    <div class="watchlist-actions">
+      <button type="button" id="runAllBtn">Run All</button>
+      <button type="button" class="icon-btn" id="copyColumnBtn" style="width:auto;padding:0 14px;" disabled>Copy Today's Column</button>
+    </div>
+    <div id="watchlistStatus"></div>
+    <table id="watchlistTable">
+      <thead><tr><th>Ticker</th><th>Price</th><th>Verdict</th></tr></thead>
+      <tbody id="watchlistTbody"></tbody>
+    </table>
   </div>
 </div>
 
